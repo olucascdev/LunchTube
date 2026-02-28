@@ -48,7 +48,7 @@ const API_ERROR_MESSAGES = {
   no_results: '📭 Nenhum vídeo encontrado nos seus canais com a duração configurada',
 };
 
-function renderVideos(videos, usedMock, apiError) {
+function renderVideos(videos, usedMock, apiError, displayCount) {
   const list = $('video-list');
   list.innerHTML = '';
 
@@ -109,7 +109,15 @@ function renderVideos(videos, usedMock, apiError) {
     list.appendChild(a);
   });
 
-  $('subtitle').textContent = `${videos.length} vídeos para o almoço`;
+  // Handle Decision Pressure: disable refresh if only 1 video or count reached 1
+  const refreshBtn = $('btn-refresh');
+  if (refreshBtn) {
+    const reachedMin = (displayCount !== undefined && displayCount <= 1);
+    refreshBtn.disabled = reachedMin;
+    refreshBtn.title = reachedMin ? 'Escolha um destes! (Limite de fôlego atingido)' : 'Ver outras opções (-1 vídeo)';
+  }
+
+  $('subtitle').textContent = `${videos.length} vídeo${videos.length === 1 ? '' : 's'} para o almoço`;
   showState('lunch');
 }
 
@@ -143,7 +151,7 @@ async function loadState() {
           videos = [];
         }
       }
-      renderVideos(videos, response.usedMock, response.apiError);
+      renderVideos(videos, response.usedMock, response.apiError, response.displayCount);
     } else {
       startCountdown(response.minutesUntil, response.settings);
     }
@@ -164,13 +172,26 @@ async function refreshVideos() {
   try {
     const response = await chrome.runtime.sendMessage({ type: 'REFRESH_VIDEOS' });
     if (response?.videos) {
-      renderVideos(response.videos, response.usedMock);
+      renderVideos(response.videos, response.usedMock, response.apiError, response.displayCount);
+      
+      // Auto-open if we reached exactly 1 video
+      if (response.videos.length === 1 && !response.videos[0].id.startsWith('mock-')) {
+        const video = response.videos[0];
+        const videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
+        
+        $('subtitle').innerHTML = '🎯 <strong>Xeque-mate!</strong> Abrindo última opção...';
+        
+        setTimeout(() => {
+          chrome.tabs.create({ url: videoUrl });
+          window.close(); // Close popup after opening
+        }, 800);
+      }
     }
   } catch (err) {
     console.error('Refresh error:', err);
   } finally {
     btn.classList.remove('spinning');
-    btn.disabled = false;
+    btn.disabled = ($('btn-refresh').disabled); // Keep disabled if renderVideos disabled it
   }
 }
 

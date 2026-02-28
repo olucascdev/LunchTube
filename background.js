@@ -57,9 +57,20 @@ async function getCachedVideos() {
   return videoCache.videos;
 }
 
-async function setCachedVideos(videos, usedMock = false, apiError = null) {
+async function setCachedVideos(videos, usedMock = false, apiError = null, displayCount = null, shownIds = []) {
+  const { videoCache: oldCache } = await chrome.storage.local.get('videoCache');
+  const count = displayCount !== null ? displayCount : (oldCache?.displayCount || videos.length);
+  const updatedShownIds = Array.from(new Set([...shownIds, ...videos.map(v => v.id)]));
+  
   await chrome.storage.local.set({
-    videoCache: { videos, usedMock, apiError, timestamp: Date.now() }
+    videoCache: { 
+      videos, 
+      usedMock, 
+      apiError, 
+      displayCount: count, 
+      shownIds: updatedShownIds,
+      timestamp: Date.now() 
+    }
   });
 }
 
@@ -150,8 +161,16 @@ function engagementScore(stats) {
 function isShort(video) {
   const dur = parseDurationToSeconds(video.contentDetails?.duration || 'PT0S');
   const title = (video.snippet?.title || '').toLowerCase();
-  // Shorts are ≤ 62 seconds OR explicitly tagged
-  return dur <= 62 || title.includes('#shorts') || title.includes('#short');
+  const desc = (video.snippet?.description || '').toLowerCase();
+  
+  // 1. Durantion check: YouTube Shorts are typically ≤ 60s, but we use 90s to be safe
+  if (dur > 0 && dur <= 90) return true;
+  
+  // 2. Hashtag and keyword check in title and description
+  if (title.includes('#shorts') || title.includes('#short') || title.includes('shorts')) return true;
+  if (desc.includes('#shorts') || desc.includes('#short')) return true;
+
+  return false;
 }
 
 // ─── Watched Videos ────────────────────────────────────────────────────────────
@@ -276,7 +295,7 @@ function getMockVideos(count) {
 }
 
 // ─── Main Refresh Logic ──────────────────────────────────────────────────────
-async function fetchAndCacheVideos(settings) {
+async function fetchAndCacheVideos(settings, overrideCount = null, excludedIds = []) {
   try {
     const token = await getAuthToken();
     const channelIds = await fetchSubscriptions(token);
@@ -291,18 +310,21 @@ async function fetchAndCacheVideos(settings) {
     // Fetch details for all collected video IDs (max 50 per request)
     const details = await fetchVideoDetails(token, allVideoIds.slice(0, 50));
 
-    // Filter by duration, Shorts, and already-watched videos
+    // Filter by duration, Shorts, already-watched videos, AND session-excluded IDs
     const maxSeconds = settings.maxDurationMinutes * 60;
     const watchedIds = await getWatchedIds();
+    const sessionExcludedSet = new Set(excludedIds);
+    
     const filtered = details.filter(v => {
       const dur = parseDurationToSeconds(v.contentDetails?.duration || 'PT0S');
       if (dur <= 0 || dur > maxSeconds) return false;  // wrong duration
       if (isShort(v)) return false;                    // exclude Shorts
-      if (watchedIds.has(v.id)) return false;           // exclude watched
+      if (watchedIds.has(v.id)) return false;           // exclude history-watched
+      if (sessionExcludedSet.has(v.id)) return false;  // exclude currently-shown-in-session
       return true;
     });
 
-    // Build video objects with engagement score
+    const countToSlice = overrideCount !== null ? overrideCount : settings.videoCount;
     const videos = filtered
       .map(v => ({
         id: v.id,
@@ -315,10 +337,10 @@ async function fetchAndCacheVideos(settings) {
         views: formatViewCount(v.statistics.viewCount)
       }))
       .sort((a, b) => b.score - a.score)
-      .slice(0, settings.videoCount);
+      .slice(0, countToSlice);
 
     if (videos.length > 0) {
-      await setCachedVideos(videos, false);
+      await setCachedVideos(videos, false, null, countToSlice, excludedIds);
       return videos;
     }
   } catch (err) {
@@ -326,14 +348,27 @@ async function fetchAndCacheVideos(settings) {
                  : err.message?.includes('token') || err.message?.includes('OAuth') ? 'not_authenticated'
                  : 'unknown';
     console.warn('LunchTube: YouTube API unavailable, using mock data.', err.message);
-    const mockVideos = getMockVideos(settings.videoCount);
-    await setCachedVideos(mockVideos, true, reason);
+    const countToSlice = overrideCount !== null ? overrideCount : settings.videoCount;
+    // For mock data, we filter manually since it's a static list
+    const sessionExcludedSet = new Set(excludedIds);
+    const mockPool = getMockVideos(20); // Get a larger pool for variety
+    const mockVideos = mockPool
+      .filter(v => !sessionExcludedSet.has(v.id))
+      .slice(0, countToSlice);
+      
+    await setCachedVideos(mockVideos, true, reason, countToSlice, excludedIds);
     return mockVideos;
   }
 
   // Fallback to mock data (API returned no videos after filtering)
-  const mockVideos = getMockVideos(settings.videoCount);
-  await setCachedVideos(mockVideos, true, 'no_results');
+  const countToSlice = overrideCount !== null ? overrideCount : settings.videoCount;
+  const mockPool = getMockVideos(20);
+  const sessionExcludedSet = new Set(excludedIds);
+  const mockVideos = mockPool
+    .filter(v => !sessionExcludedSet.has(v.id))
+    .slice(0, countToSlice);
+
+  await setCachedVideos(mockVideos, true, 'no_results', countToSlice, excludedIds);
   return mockVideos;
 }
 
@@ -383,12 +418,12 @@ async function handleGetState() {
     const { videoCache } = await chrome.storage.local.get('videoCache');
     // Guard: only use cache if videos is a real array (avoids old malformed data)
     if (videoCache?.videos && Array.isArray(videoCache.videos) && videoCache.videos.length > 0) {
-      return { state: 'lunch', videos: videoCache.videos, usedMock: videoCache.usedMock, apiError: videoCache.apiError, settings };
+      return { state: 'lunch', videos: videoCache.videos, usedMock: videoCache.usedMock, apiError: videoCache.apiError, displayCount: videoCache.displayCount, settings };
     }
     // Fetch fresh
     const videos = await fetchAndCacheVideos(settings);
     const { videoCache: vc2 } = await chrome.storage.local.get('videoCache');
-    return { state: 'lunch', videos, usedMock: vc2?.usedMock, apiError: vc2?.apiError, settings };
+    return { state: 'lunch', videos, usedMock: vc2?.usedMock, apiError: vc2?.apiError, displayCount: vc2?.displayCount, settings };
   }
 
   return { state: 'waiting', minutesUntil: minsUntil, settings };
@@ -396,10 +431,16 @@ async function handleGetState() {
 
 async function handleRefresh() {
   const { settings } = await chrome.storage.sync.get({ settings: DEFAULT_SETTINGS });
-  await chrome.storage.local.remove('videoCache');
-  const videos = await fetchAndCacheVideos(settings);
   const { videoCache } = await chrome.storage.local.get('videoCache');
-  return { videos, usedMock: videoCache?.usedMock };
+  
+  const currentCount = videoCache?.displayCount ?? settings.videoCount;
+  const newCount = Math.max(1, currentCount - 1);
+  const shownIds = videoCache?.shownIds || [];
+  
+  // We keep the cache valid but fetch a fresh SET excluding shownIds
+  const videos = await fetchAndCacheVideos(settings, newCount, shownIds);
+  const { videoCache: vc2 } = await chrome.storage.local.get('videoCache');
+  return { videos, usedMock: vc2?.usedMock, apiError: vc2?.apiError, displayCount: vc2?.displayCount };
 }
 
 async function handleInteractiveAuth() {

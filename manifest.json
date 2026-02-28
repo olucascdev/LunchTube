@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LunchTube",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Seleção automática de vídeos do YouTube para o seu horário de almoço. Zero tempo perdido decidindo o que assistir.",
   "author": "Lucas Correia",
   "icons": {
