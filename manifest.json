@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "LunchTube",
+  "version": "1.0.0",
+  "description": "LunchTube eliminates wasted time choosing videos on YouTube during lunch breaks. When opening YouTube, users will find five videos automatically selected from the channels they already follow, ready to watch.",
+  "author": "Lucas Correia",
+  "icons": {
+    "48": "images/icon-48.png",
+    "128": "images/icon-128.png"
+  },
+  "browser_action": {
+    "default_title": "LunchTube"
+    
+    
+  }
+}
