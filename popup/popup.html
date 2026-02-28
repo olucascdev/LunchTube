@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LunchTube</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <img src="../images/icon-48.png" alt="LunchTube" class="logo" />
+        <div class="header-text">
+          <span class="app-name">LunchTube</span>
+          <span class="app-subtitle" id="subtitle">Carregando...</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button
+          class="icon-btn"
+          id="btn-refresh"
+          title="Atualizar"
+          aria-label="Atualizar vídeos"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            fill="currentColor"
+            viewBox="0 0 256 256"
+          >
+            <path
+              d="M240,56v48a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16h28.69L196.12,79.51a96,96,0,1,0,1.55,136.49,8,8,0,0,1,11.3,11.32A112,112,0,1,1,204.77,54.06l19.65,18.51L224,48a8,8,0,0,1,16,0Z"
+            />
+          </svg>
+        </button>
+        <button
+          class="icon-btn"
+          id="btn-settings"
+          title="Configurações"
+          aria-label="Abrir configurações"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            fill="currentColor"
+            viewBox="0 0 256 256"
+          >
+            <path
+              d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm109.94-52.79a8,8,0,0,0-3.89-5.4l-18.56-10.57-.29-1.1,9.19-18.36a8,8,0,0,0-1.48-9.23l-21.47-21.47a8,8,0,0,0-9.22-1.48L174,29.41l-1.12-.3L162.32,10.54a8,8,0,0,0-6.95-4h-30.3a8,8,0,0,0-6.94,4L108.42,29.11l-1.12.3L89,19.6a8,8,0,0,0-9.23,1.48L58.29,42.55a8,8,0,0,0-1.48,9.23l9.19,18.36-.29,1.1L47.15,81.81a8,8,0,0,0-3.89,5.4A104.84,104.84,0,0,0,40,104v.36a8,8,0,0,0,4,6.94l18.56,10.57.29,1.1L53.65,141.33a8,8,0,0,0,1.48,9.23L76.6,171.94a8,8,0,0,0,9.23,1.48l18.36-9.19,1.12.29L115.68,183a8,8,0,0,0,6.94,4h30.3a8,8,0,0,0,6.95-4l10.57-18.56,1.12-.29,18.36,9.19a8,8,0,0,0,9.22-1.48l21.47-21.47a8,8,0,0,0,1.48-9.23l-9.19-18.36.29-1.1L230.33,111.3a8,8,0,0,0,4-6.94V104A104.84,104.84,0,0,0,237.94,107.21ZM216,105.4l-17.1,9.74a8,8,0,0,0-3.73,4.76c-.51,1.83-1.08,3.65-1.71,5.47a8,8,0,0,0,.57,6.09l8.49,16.95-12.12,12.13-16.95-8.49a8,8,0,0,0-6.07.56c-1.81.62-3.63,1.19-5.46,1.7a8,8,0,0,0-4.76,3.74L147.4,176H130.6l-9.74-17.1a8,8,0,0,0-4.77-3.73c-1.83-.51-3.65-1.08-5.46-1.71a8,8,0,0,0-6.08.57L88.6,162.52,76.47,150.4l8.49-16.95a8,8,0,0,0,.57-6.08c-.63-1.82-1.2-3.64-1.71-5.47a8,8,0,0,0-3.74-4.76L62,107.4v-6.8L79.08,90.86a8,8,0,0,0,3.74-4.76c.51-1.83,1.08-3.65,1.71-5.47a8,8,0,0,0-.57-6.08L75.47,58.6,87.6,46.47l16.95,8.49a8,8,0,0,0,6.07-.56c1.81-.62,3.63-1.2,5.47-1.71a8,8,0,0,0,4.76-3.74L130.6,32h16.8l9.74,17.1a8,8,0,0,0,4.77,3.73c1.82.51,3.64,1.08,5.46,1.71a8,8,0,0,0,6.08-.57l16.95-8.49L203.53,57.6l-8.49,16.95a8,8,0,0,0-.57,6.08c.63,1.82,1.2,3.65,1.71,5.47a8,8,0,0,0,3.74,4.76L217,100.6Z"
+            />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Loading State -->
+    <div class="state-container" id="state-loading">
+      <div class="spinner"></div>
+      <p class="state-text">Buscando vídeos...</p>
+    </div>
+
+    <!-- Auth State -->
+    <div class="state-container hidden" id="state-auth">
+      <div class="state-icon">🔐</div>
+      <p class="state-title">Conecte sua conta</p>
+      <p class="state-text">
+        Para sugestões personalizadas dos seus canais inscritos, conecte sua
+        conta Google.
+      </p>
+      <button class="btn-primary" id="btn-auth">Conectar com Google</button>
+      <button class="btn-secondary" id="btn-use-mock">
+        Usar sugestões gerais
+      </button>
+    </div>
+
+    <!-- Waiting State (outside lunch time) -->
+    <div class="state-container hidden" id="state-waiting">
+      <div class="lunch-icon">🍽️</div>
+      <p class="state-title">Hora do almoço em breve!</p>
+      <div class="countdown" id="countdown">
+        <div class="countdown-block">
+          <span class="countdown-num" id="count-h">00</span>
+          <span class="countdown-label">horas</span>
+        </div>
+        <span class="countdown-sep">:</span>
+        <div class="countdown-block">
+          <span class="countdown-num" id="count-m">00</span>
+          <span class="countdown-label">min</span>
+        </div>
+      </div>
+      <p class="state-sub" id="lunch-schedule">Seu almoço começa às 12:00</p>
+    </div>
+
+    <!-- Lunch State (video list) -->
+    <div class="hidden" id="state-lunch">
+      <div class="lunch-header">
+        <div class="lunch-badge">🍴 Hora do almoço!</div>
+        <span class="mock-badge hidden" id="mock-badge">demo</span>
+      </div>
+      <div class="video-list" id="video-list">
+        <!-- Video cards injected by JS -->
+      </div>
+    </div>
+
+    <!-- Error State -->
+    <div class="state-container hidden" id="state-error">
+      <div class="state-icon">⚠️</div>
+      <p class="state-title">Erro ao carregar</p>
+      <p class="state-text" id="error-message">Tente novamente em instantes.</p>
+      <button class="btn-primary" id="btn-retry">Tentar novamente</button>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LunchTube — Configurações</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="page">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <img src="../images/icon-48.png" alt="LunchTube" />
+        <span>LunchTube</span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#section-lunch" class="nav-item active" data-section="lunch">
+          <span class="nav-icon">🕐</span>
+          Horário de almoço
+        </a>
+        <a href="#section-videos" class="nav-item" data-section="videos">
+          <span class="nav-icon">🎬</span>
+          Preferências de vídeo
+        </a>
+        <a href="#section-account" class="nav-item" data-section="account">
+          <span class="nav-icon">👤</span>
+          Conta Google
+        </a>
+      </nav>
+      <div class="sidebar-footer">v1.0.0</div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+      <div class="content">
+
+        <!-- Section: Lunch Time -->
+        <section class="section active" id="section-lunch">
+          <div class="section-header">
+            <h2 class="section-title">Horário de almoço</h2>
+            <p class="section-desc">Configure quando começa e termina seu intervalo. O LunchTube ativará automaticamente neste período.</p>
+          </div>
+
+          <div class="card">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="label" for="lunch-start">Início do almoço</label>
+                <input type="time" id="lunch-start" class="input-time" value="12:00" />
+              </div>
+              <div class="form-group">
+                <label class="label" for="lunch-end">Fim do almoço</label>
+                <input type="time" id="lunch-end" class="input-time" value="13:00" />
+              </div>
+            </div>
+
+            <div class="preview-box" id="lunch-preview">
+              ⏱️ Intervalo de <strong id="preview-duration">60</strong> minutos
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Video Preferences -->
+        <section class="section" id="section-videos">
+          <div class="section-header">
+            <h2 class="section-title">Preferências de vídeo</h2>
+            <p class="section-desc">Ajuste a duração máxima dos vídeos e quantas sugestões deseja receber.</p>
+          </div>
+
+          <div class="card">
+            <div class="form-group">
+              <label class="label" for="max-duration">
+                Duração máxima dos vídeos
+                <span class="label-value" id="max-duration-value">20 min</span>
+              </label>
+              <input type="range" id="max-duration" class="slider" min="5" max="60" step="5" value="20" />
+              <div class="slider-marks">
+                <span>5 min</span>
+                <span>30 min</span>
+                <span>60 min</span>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="form-group">
+              <label class="label" for="video-count">
+                Quantidade de sugestões
+                <span class="label-value" id="video-count-value">10 vídeos</span>
+              </label>
+              <input type="range" id="video-count" class="slider" min="3" max="20" step="1" value="10" />
+              <div class="slider-marks">
+                <span>3</span>
+                <span>10</span>
+                <span>20</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Account -->
+        <section class="section" id="section-account">
+          <div class="section-header">
+            <h2 class="section-title">Conta Google</h2>
+            <p class="section-desc">Conecte sua conta para receber sugestões personalizadas dos seus canais inscritos.</p>
+          </div>
+
+          <div class="card">
+            <div class="account-status" id="account-status">
+              <div class="account-icon">👤</div>
+              <div class="account-info">
+                <span class="account-name" id="account-name">Não conectado</span>
+                <span class="account-sub" id="account-sub">Use sugestões gerais sem conectar</span>
+              </div>
+            </div>
+
+            <button class="btn-connect" id="btn-connect">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M19.8 10.2c0-.7-.06-1.37-.19-2H10v3.77h5.5a4.72 4.72 0 01-2.04 3.1v2.58h3.3c1.93-1.78 3.04-4.4 3.04-7.45z" fill="#4285F4"/>
+                <path d="M10 20c2.76 0 5.08-.92 6.77-2.48l-3.3-2.57c-.92.62-2.1.98-3.47.98-2.66 0-4.92-1.8-5.73-4.22H.85v2.65A10 10 0 0010 20z" fill="#34A853"/>
+                <path d="M4.27 11.71A5.99 5.99 0 014 10c0-.6.1-1.17.27-1.71V5.64H.85A10 10 0 000 10c0 1.61.38 3.13 1.05 4.47l3.22-2.76z" fill="#FBBC05"/>
+                <path d="M10 3.96c1.5 0 2.84.52 3.9 1.53l2.93-2.93A9.97 9.97 0 0010 0 10 10 0 00.85 5.64l3.42 2.65C5.09 5.78 7.34 3.96 10 3.96z" fill="#EA4335"/>
+              </svg>
+              Conectar com Google
+            </button>
+
+            <div class="info-box">
+              <strong>🔒 Privacidade:</strong> Acessamos apenas a lista de canais inscritos para fazer sugestões personalizadas. Nenhum dado é compartilhado com terceiros.
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Footer Actions -->
+      <div class="footer">
+        <span class="save-message" id="save-message"></span>
+        <button class="btn-save" id="btn-save">Salvar configurações</button>
+      </div>
+    </main>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

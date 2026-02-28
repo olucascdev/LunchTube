@@ -1,0 +1,376 @@
+// LunchTube - Background Service Worker
+// Handles YouTube API, lunch time detection, video caching
+
+const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
+
+// ─── Default Settings ───────────────────────────────────────────────────────
+const DEFAULT_SETTINGS = {
+  lunchStart: '12:00',
+  lunchEnd: '13:00',
+  maxDurationMinutes: 20,
+  videoCount: 10,
+};
+
+// ─── Alarm Setup ─────────────────────────────────────────────────────────────
+chrome.runtime.onInstalled.addListener(async () => {
+  const existing = await chrome.storage.sync.get('settings');
+  if (!existing.settings) {
+    await chrome.storage.sync.set({ settings: DEFAULT_SETTINGS });
+  }
+  chrome.alarms.create('lunchCheck', { periodInMinutes: 5 });
+});
+
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name === 'lunchCheck') {
+    await refreshIfLunchTime();
+  }
+});
+
+// ─── Lunch Time Detection ────────────────────────────────────────────────────
+function isLunchTime(settings) {
+  const now = new Date();
+  const [startH, startM] = settings.lunchStart.split(':').map(Number);
+  const [endH, endM] = settings.lunchEnd.split(':').map(Number);
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+  return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+}
+
+function minutesUntilLunch(settings) {
+  const now = new Date();
+  const [startH, startM] = settings.lunchStart.split(':').map(Number);
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const startMinutes = startH * 60 + startM;
+  const diff = startMinutes - currentMinutes;
+  return diff > 0 ? diff : 24 * 60 + diff;
+}
+
+// ─── Cache Management ────────────────────────────────────────────────────────
+async function getCachedVideos() {
+  const { videoCache } = await chrome.storage.local.get('videoCache');
+  if (!videoCache) return null;
+  if (Date.now() - videoCache.timestamp > CACHE_DURATION_MS) return null;
+  return videoCache.videos;
+}
+
+async function setCachedVideos(videos) {
+  await chrome.storage.local.set({
+    videoCache: { videos, timestamp: Date.now() }
+  });
+}
+
+// ─── YouTube API ─────────────────────────────────────────────────────────────
+async function getAuthToken() {
+  return new Promise((resolve, reject) => {
+    chrome.identity.getAuthToken({ interactive: false }, (token) => {
+      if (chrome.runtime.lastError || !token) {
+        reject(chrome.runtime.lastError || new Error('No token'));
+      } else {
+        resolve(token);
+      }
+    });
+  });
+}
+
+async function fetchSubscriptions(token) {
+  const url = `${YOUTUBE_API_BASE}/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error(`Subscriptions API error: ${res.status}`);
+  const data = await res.json();
+  return (data.items || []).map(item => item.snippet.resourceId.channelId);
+}
+
+async function fetchRecentVideosFromChannel(token, channelId, maxResults = 5) {
+  // Get uploads playlist for channel
+  const channelRes = await fetch(
+    `${YOUTUBE_API_BASE}/channels?part=contentDetails&id=${channelId}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!channelRes.ok) return [];
+  const channelData = await channelRes.json();
+  const playlistId = channelData.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+  if (!playlistId) return [];
+
+  // Get recent videos from uploads playlist
+  const playlistRes = await fetch(
+    `${YOUTUBE_API_BASE}/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=${maxResults}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!playlistRes.ok) return [];
+  const playlistData = await playlistRes.json();
+  return (playlistData.items || []).map(item => item.snippet.resourceId.videoId);
+}
+
+async function fetchVideoDetails(token, videoIds) {
+  if (videoIds.length === 0) return [];
+  const ids = videoIds.join(',');
+  const res = await fetch(
+    `${YOUTUBE_API_BASE}/videos?part=snippet,contentDetails,statistics&id=${ids}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.items || [];
+}
+
+// ─── Duration Parsing ─────────────────────────────────────────────────────────
+function parseDurationToSeconds(iso8601) {
+  const match = iso8601.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return 0;
+  const hours = parseInt(match[1] || '0');
+  const minutes = parseInt(match[2] || '0');
+  const seconds = parseInt(match[3] || '0');
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
+function formatDuration(iso8601) {
+  const total = parseDurationToSeconds(iso8601);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// ─── Engagement Score ─────────────────────────────────────────────────────────
+function engagementScore(stats) {
+  const views = parseInt(stats.viewCount || '1');
+  const likes = parseInt(stats.likeCount || '0');
+  const comments = parseInt(stats.commentCount || '0');
+  return (likes + comments * 2) / Math.max(views, 1);
+}
+
+// ─── Mock Data (used when API not configured or fails) ───────────────────────
+function getMockVideos(count) {
+  const mockData = [
+    {
+      id: 'dQw4w9WgXcQ',
+      title: 'Como ser mais produtivo no trabalho',
+      channel: 'Produtividade Plus',
+      thumbnail: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
+      duration: '12:34',
+      durationSeconds: 754,
+      score: 0.045,
+      views: '1.2M'
+    },
+    {
+      id: 'jNQXAC9IVRw',
+      title: 'Os segredos da alimentação saudável',
+      channel: 'Saúde em Foco',
+      thumbnail: 'https://img.youtube.com/vi/jNQXAC9IVRw/mqdefault.jpg',
+      duration: '8:20',
+      durationSeconds: 500,
+      score: 0.038,
+      views: '890K'
+    },
+    {
+      id: '9bZkp7q19f0',
+      title: 'Aprenda JavaScript em 15 minutos',
+      channel: 'Dev Rápido',
+      thumbnail: 'https://img.youtube.com/vi/9bZkp7q19f0/mqdefault.jpg',
+      duration: '15:00',
+      durationSeconds: 900,
+      score: 0.062,
+      views: '2.1M'
+    },
+    {
+      id: 'kJQP7kiw5Fk',
+      title: 'Receitas rápidas para o almoço',
+      channel: 'Culinária Express',
+      thumbnail: 'https://img.youtube.com/vi/kJQP7kiw5Fk/mqdefault.jpg',
+      duration: '10:15',
+      durationSeconds: 615,
+      score: 0.051,
+      views: '560K'
+    },
+    {
+      id: 'fJ9rUzIMcZQ',
+      title: 'Meditação guiada de 10 minutos',
+      channel: 'Mente Zen',
+      thumbnail: 'https://img.youtube.com/vi/fJ9rUzIMcZQ/mqdefault.jpg',
+      duration: '10:00',
+      durationSeconds: 600,
+      score: 0.072,
+      views: '3.4M'
+    },
+    {
+      id: 'e-kkZuLt4vU',
+      title: 'Design Thinking na prática',
+      channel: 'UX Brasil',
+      thumbnail: 'https://img.youtube.com/vi/e-kkZuLt4vU/mqdefault.jpg',
+      duration: '18:45',
+      durationSeconds: 1125,
+      score: 0.041,
+      views: '445K'
+    },
+    {
+      id: '2vjPBrBU-TM',
+      title: 'Finanças pessoais: como economizar',
+      channel: 'Dinheiro Inteligente',
+      thumbnail: 'https://img.youtube.com/vi/2vjPBrBU-TM/mqdefault.jpg',
+      duration: '14:22',
+      durationSeconds: 862,
+      score: 0.058,
+      views: '1.8M'
+    },
+    {
+      id: 'hY7m5jjJ9mM',
+      title: 'Top 10 extensões para desenvolvedores',
+      channel: 'CodeBrasil',
+      thumbnail: 'https://img.youtube.com/vi/hY7m5jjJ9mM/mqdefault.jpg',
+      duration: '11:50',
+      durationSeconds: 710,
+      score: 0.067,
+      views: '720K'
+    },
+    {
+      id: 'oHg5SJYRHA0',
+      title: 'Rotina matinal de alta performance',
+      channel: 'Alta Performance',
+      thumbnail: 'https://img.youtube.com/vi/oHg5SJYRHA0/mqdefault.jpg',
+      duration: '9:33',
+      durationSeconds: 573,
+      score: 0.049,
+      views: '990K'
+    },
+    {
+      id: 'xvFZjo5PgG0',
+      title: 'Como aprender qualquer coisa mais rápido',
+      channel: 'Aprendizado Acelerado',
+      thumbnail: 'https://img.youtube.com/vi/xvFZjo5PgG0/mqdefault.jpg',
+      duration: '16:10',
+      durationSeconds: 970,
+      score: 0.055,
+      views: '2.5M'
+    }
+  ];
+  return mockData.slice(0, count).sort((a, b) => b.score - a.score);
+}
+
+// ─── Main Refresh Logic ──────────────────────────────────────────────────────
+async function fetchAndCacheVideos(settings) {
+  try {
+    const token = await getAuthToken();
+    const channelIds = await fetchSubscriptions(token);
+
+    // Fetch recent videos from first 10 subscribed channels
+    const sampleChannels = channelIds.slice(0, 10);
+    const videoIdArrays = await Promise.all(
+      sampleChannels.map(id => fetchRecentVideosFromChannel(token, id, 3))
+    );
+    const allVideoIds = videoIdArrays.flat();
+
+    // Fetch details for all collected video IDs (max 50 per request)
+    const details = await fetchVideoDetails(token, allVideoIds.slice(0, 50));
+
+    // Filter by duration
+    const maxSeconds = settings.maxDurationMinutes * 60;
+    const filtered = details.filter(v => {
+      const dur = parseDurationToSeconds(v.contentDetails?.duration || 'PT0S');
+      return dur > 0 && dur <= maxSeconds;
+    });
+
+    // Build video objects with engagement score
+    const videos = filtered
+      .map(v => ({
+        id: v.id,
+        title: v.snippet.title,
+        channel: v.snippet.channelTitle,
+        thumbnail: v.snippet.thumbnails?.medium?.url || v.snippet.thumbnails?.default?.url,
+        duration: formatDuration(v.contentDetails.duration),
+        durationSeconds: parseDurationToSeconds(v.contentDetails.duration),
+        score: engagementScore(v.statistics),
+        views: formatViewCount(v.statistics.viewCount)
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, settings.videoCount);
+
+    if (videos.length > 0) {
+      await setCachedVideos({ videos, usedMock: false });
+      return videos;
+    }
+  } catch (err) {
+    console.warn('LunchTube: YouTube API unavailable, using mock data.', err.message);
+  }
+
+  // Fallback to mock data
+  const mockVideos = getMockVideos(settings.videoCount);
+  await setCachedVideos({ videos: mockVideos, usedMock: true });
+  return mockVideos;
+}
+
+function formatViewCount(count) {
+  const n = parseInt(count || '0');
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(0)}K`;
+  return String(n);
+}
+
+async function refreshIfLunchTime() {
+  const { settings } = await chrome.storage.sync.get({ settings: DEFAULT_SETTINGS });
+  if (isLunchTime(settings)) {
+    const cached = await getCachedVideos();
+    if (!cached) {
+      await fetchAndCacheVideos(settings);
+    }
+  }
+}
+
+// ─── Message Handler ──────────────────────────────────────────────────────────
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+  if (request.type === 'GET_STATE') {
+    handleGetState().then(sendResponse);
+    return true; // async
+  }
+  if (request.type === 'REFRESH_VIDEOS') {
+    handleRefresh().then(sendResponse);
+    return true;
+  }
+  if (request.type === 'AUTH_INTERACTIVE') {
+    handleInteractiveAuth().then(sendResponse);
+    return true;
+  }
+});
+
+async function handleGetState() {
+  const { settings } = await chrome.storage.sync.get({ settings: DEFAULT_SETTINGS });
+  const lunch = isLunchTime(settings);
+  const minsUntil = minutesUntilLunch(settings);
+
+  if (lunch) {
+    const { videoCache } = await chrome.storage.local.get('videoCache');
+    if (videoCache?.videos) {
+      return { state: 'lunch', videos: videoCache.videos, usedMock: videoCache.usedMock, settings };
+    }
+    // Fetch fresh
+    const videos = await fetchAndCacheVideos(settings);
+    const { videoCache: vc2 } = await chrome.storage.local.get('videoCache');
+    return { state: 'lunch', videos, usedMock: vc2?.usedMock, settings };
+  }
+
+  return { state: 'waiting', minutesUntil: minsUntil, settings };
+}
+
+async function handleRefresh() {
+  const { settings } = await chrome.storage.sync.get({ settings: DEFAULT_SETTINGS });
+  await chrome.storage.local.remove('videoCache');
+  const videos = await fetchAndCacheVideos(settings);
+  const { videoCache } = await chrome.storage.local.get('videoCache');
+  return { videos, usedMock: videoCache?.usedMock };
+}
+
+async function handleInteractiveAuth() {
+  return new Promise((resolve) => {
+    chrome.identity.getAuthToken({ interactive: true }, (token) => {
+      if (chrome.runtime.lastError || !token) {
+        resolve({ success: false, error: chrome.runtime.lastError?.message });
+      } else {
+        resolve({ success: true });
+      }
+    });
+  });
+}

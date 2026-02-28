@@ -1,0 +1,184 @@
+/* LunchTube - Content Script Styles */
+
+#lunchtube-panel {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: #181818;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding: 16px 24px;
+  width: 100%;
+  animation: lt-slideDown 0.35s cubic-bezier(0.2,0,0,1) both;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 100;
+}
+
+@keyframes lt-slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes lt-slideUp {
+  from { transform: translateY(0); opacity: 1; }
+  to   { transform: translateY(-100%); opacity: 0; }
+}
+
+/* ─── Header ─────────────────────────────────────────────────────────────── */
+.lt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.lt-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lt-icon {
+  font-size: 18px;
+}
+
+.lt-title-main {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.3px;
+}
+
+.lt-subtitle {
+  font-size: 12px;
+  color: #ff4444;
+  font-weight: 500;
+  background: rgba(255,68,68,0.12);
+  border: 1px solid rgba(255,68,68,0.25);
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+
+.lt-mock-badge {
+  font-size: 10px;
+  color: #555;
+  background: #212121;
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 2px 7px;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.lt-close {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+  font-family: inherit;
+}
+
+.lt-close:hover {
+  color: #fff;
+  background: rgba(255,255,255,0.08);
+}
+
+/* ─── Scroll container ───────────────────────────────────────────────────── */
+.lt-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+  padding-bottom: 4px;
+}
+
+.lt-scroll::-webkit-scrollbar { height: 3px; }
+.lt-scroll::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+/* ─── Grid ───────────────────────────────────────────────────────────────── */
+.lt-grid {
+  display: flex;
+  gap: 12px;
+  width: max-content;
+}
+
+/* ─── Card ───────────────────────────────────────────────────────────────── */
+.lt-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+  width: 180px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  padding: 4px;
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+
+.lt-card:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.lt-thumb-wrap {
+  position: relative;
+  width: 100%;
+  height: 101px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #212121;
+  flex-shrink: 0;
+}
+
+.lt-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+.lt-card:hover .lt-thumb {
+  transform: scale(1.05);
+}
+
+.lt-duration {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0,0,0,0.85);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.lt-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 2px;
+}
+
+.lt-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #eeeeee;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
+}
+
+.lt-channel {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

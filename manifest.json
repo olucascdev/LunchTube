@@ -2,15 +2,46 @@
   "manifest_version": 3,
   "name": "LunchTube",
   "version": "1.0.0",
-  "description": "LunchTube eliminates wasted time choosing videos on YouTube during lunch breaks. When opening YouTube, users will find five videos automatically selected from the channels they already follow, ready to watch.",
+  "description": "Seleção automática de vídeos do YouTube para o seu horário de almoço. Zero tempo perdido decidindo o que assistir.",
   "author": "Lucas Correia",
   "icons": {
+    "16": "images/icon-16.png",
     "48": "images/icon-48.png",
     "128": "images/icon-128.png"
   },
-  "browser_action": {
-    "default_title": "LunchTube"
-    
-    
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "LunchTube",
+    "default_icon": {
+      "16": "images/icon-16.png",
+      "48": "images/icon-48.png",
+      "128": "images/icon-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "options/options.html",
+  "content_scripts": [
+    {
+      "matches": ["*://www.youtube.com/*"],
+      "js": ["content/content.js"],
+      "css": ["content/content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "storage",
+    "alarms",
+    "identity"
+  ],
+  "host_permissions": [
+    "*://www.googleapis.com/*"
+  ],
+  "oauth2": {
+    "client_id": "931108821214-4gvnt6sep0pvi3p1i2i1s6277sth183l.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/youtube.readonly"
+    ]
   }
 }
