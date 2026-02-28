@@ -18,6 +18,8 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!existing.settings) {
     await chrome.storage.sync.set({ settings: DEFAULT_SETTINGS });
   }
+  // Always wipe cache on install/update to avoid stale/malformed data
+  await chrome.storage.local.remove('videoCache');
   chrome.alarms.create('lunchCheck', { periodInMinutes: 5 });
 });
 
@@ -55,9 +57,9 @@ async function getCachedVideos() {
   return videoCache.videos;
 }
 
-async function setCachedVideos(videos) {
+async function setCachedVideos(videos, usedMock = false) {
   await chrome.storage.local.set({
-    videoCache: { videos, timestamp: Date.now() }
+    videoCache: { videos, usedMock, timestamp: Date.now() }
   });
 }
 
@@ -290,7 +292,7 @@ async function fetchAndCacheVideos(settings) {
       .slice(0, settings.videoCount);
 
     if (videos.length > 0) {
-      await setCachedVideos({ videos, usedMock: false });
+      await setCachedVideos(videos, false);
       return videos;
     }
   } catch (err) {
@@ -299,7 +301,7 @@ async function fetchAndCacheVideos(settings) {
 
   // Fallback to mock data
   const mockVideos = getMockVideos(settings.videoCount);
-  await setCachedVideos({ videos: mockVideos, usedMock: true });
+  await setCachedVideos(mockVideos, true);
   return mockVideos;
 }
 
@@ -343,7 +345,8 @@ async function handleGetState() {
 
   if (lunch) {
     const { videoCache } = await chrome.storage.local.get('videoCache');
-    if (videoCache?.videos) {
+    // Guard: only use cache if videos is a real array (avoids old malformed data)
+    if (videoCache?.videos && Array.isArray(videoCache.videos) && videoCache.videos.length > 0) {
       return { state: 'lunch', videos: videoCache.videos, usedMock: videoCache.usedMock, settings };
     }
     // Fetch fresh
