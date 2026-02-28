@@ -57,9 +57,9 @@ async function getCachedVideos() {
   return videoCache.videos;
 }
 
-async function setCachedVideos(videos, usedMock = false) {
+async function setCachedVideos(videos, usedMock = false, apiError = null) {
   await chrome.storage.local.set({
-    videoCache: { videos, usedMock, timestamp: Date.now() }
+    videoCache: { videos, usedMock, apiError, timestamp: Date.now() }
   });
 }
 
@@ -150,100 +150,100 @@ function engagementScore(stats) {
 function getMockVideos(count) {
   const mockData = [
     {
-      id: 'dQw4w9WgXcQ',
+      id: 'mock-1',
       title: 'Como ser mais produtivo no trabalho',
       channel: 'Produtividade Plus',
-      thumbnail: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
+      thumbnail: 'https://picsum.photos/seed/productivity/320/180',
       duration: '12:34',
       durationSeconds: 754,
       score: 0.045,
       views: '1.2M'
     },
     {
-      id: 'jNQXAC9IVRw',
+      id: 'mock-2',
       title: 'Os segredos da alimentação saudável',
       channel: 'Saúde em Foco',
-      thumbnail: 'https://img.youtube.com/vi/jNQXAC9IVRw/mqdefault.jpg',
+      thumbnail: 'https://picsum.photos/seed/food/320/180',
       duration: '8:20',
       durationSeconds: 500,
       score: 0.038,
       views: '890K'
     },
     {
-      id: '9bZkp7q19f0',
+      id: 'mock-3',
       title: 'Aprenda JavaScript em 15 minutos',
       channel: 'Dev Rápido',
-      thumbnail: 'https://img.youtube.com/vi/9bZkp7q19f0/mqdefault.jpg',
+      thumbnail: 'https://picsum.photos/seed/coding/320/180',
       duration: '15:00',
       durationSeconds: 900,
       score: 0.062,
       views: '2.1M'
     },
     {
-      id: 'kJQP7kiw5Fk',
+      id: 'mock-4',
       title: 'Receitas rápidas para o almoço',
       channel: 'Culinária Express',
-      thumbnail: 'https://img.youtube.com/vi/kJQP7kiw5Fk/mqdefault.jpg',
+      thumbnail: 'https://picsum.photos/seed/kitchen/320/180',
       duration: '10:15',
       durationSeconds: 615,
       score: 0.051,
       views: '560K'
     },
     {
-      id: 'fJ9rUzIMcZQ',
+      id: 'mock-5',
       title: 'Meditação guiada de 10 minutos',
       channel: 'Mente Zen',
-      thumbnail: 'https://img.youtube.com/vi/fJ9rUzIMcZQ/mqdefault.jpg',
+      thumbnail: 'https://picsum.photos/seed/meditation/320/180',
       duration: '10:00',
       durationSeconds: 600,
       score: 0.072,
       views: '3.4M'
     },
     {
-      id: 'e-kkZuLt4vU',
+      id: 'mock-6',
       title: 'Design Thinking na prática',
       channel: 'UX Brasil',
-      thumbnail: 'https://img.youtube.com/vi/e-kkZuLt4vU/mqdefault.jpg',
+      thumbnail: 'https://picsum.photos/seed/design/320/180',
       duration: '18:45',
       durationSeconds: 1125,
       score: 0.041,
       views: '445K'
     },
     {
-      id: '2vjPBrBU-TM',
+      id: 'mock-7',
       title: 'Finanças pessoais: como economizar',
       channel: 'Dinheiro Inteligente',
-      thumbnail: 'https://img.youtube.com/vi/2vjPBrBU-TM/mqdefault.jpg',
+      thumbnail: 'https://picsum.photos/seed/finance/320/180',
       duration: '14:22',
       durationSeconds: 862,
       score: 0.058,
       views: '1.8M'
     },
     {
-      id: 'hY7m5jjJ9mM',
+      id: 'mock-8',
       title: 'Top 10 extensões para desenvolvedores',
       channel: 'CodeBrasil',
-      thumbnail: 'https://img.youtube.com/vi/hY7m5jjJ9mM/mqdefault.jpg',
+      thumbnail: 'https://picsum.photos/seed/tech/320/180',
       duration: '11:50',
       durationSeconds: 710,
       score: 0.067,
       views: '720K'
     },
     {
-      id: 'oHg5SJYRHA0',
+      id: 'mock-9',
       title: 'Rotina matinal de alta performance',
       channel: 'Alta Performance',
-      thumbnail: 'https://img.youtube.com/vi/oHg5SJYRHA0/mqdefault.jpg',
+      thumbnail: 'https://picsum.photos/seed/morning/320/180',
       duration: '9:33',
       durationSeconds: 573,
       score: 0.049,
       views: '990K'
     },
     {
-      id: 'xvFZjo5PgG0',
+      id: 'mock-10',
       title: 'Como aprender qualquer coisa mais rápido',
       channel: 'Aprendizado Acelerado',
-      thumbnail: 'https://img.youtube.com/vi/xvFZjo5PgG0/mqdefault.jpg',
+      thumbnail: 'https://picsum.photos/seed/learning/320/180',
       duration: '16:10',
       durationSeconds: 970,
       score: 0.055,
@@ -296,12 +296,18 @@ async function fetchAndCacheVideos(settings) {
       return videos;
     }
   } catch (err) {
+    const reason = err.message?.includes('403') ? 'youtube_api_disabled'
+                 : err.message?.includes('token') || err.message?.includes('OAuth') ? 'not_authenticated'
+                 : 'unknown';
     console.warn('LunchTube: YouTube API unavailable, using mock data.', err.message);
+    const mockVideos = getMockVideos(settings.videoCount);
+    await setCachedVideos(mockVideos, true, reason);
+    return mockVideos;
   }
 
-  // Fallback to mock data
+  // Fallback to mock data (API returned no videos after filtering)
   const mockVideos = getMockVideos(settings.videoCount);
-  await setCachedVideos(mockVideos, true);
+  await setCachedVideos(mockVideos, true, 'no_results');
   return mockVideos;
 }
 
@@ -347,12 +353,12 @@ async function handleGetState() {
     const { videoCache } = await chrome.storage.local.get('videoCache');
     // Guard: only use cache if videos is a real array (avoids old malformed data)
     if (videoCache?.videos && Array.isArray(videoCache.videos) && videoCache.videos.length > 0) {
-      return { state: 'lunch', videos: videoCache.videos, usedMock: videoCache.usedMock, settings };
+      return { state: 'lunch', videos: videoCache.videos, usedMock: videoCache.usedMock, apiError: videoCache.apiError, settings };
     }
     // Fetch fresh
     const videos = await fetchAndCacheVideos(settings);
     const { videoCache: vc2 } = await chrome.storage.local.get('videoCache');
-    return { state: 'lunch', videos, usedMock: vc2?.usedMock, settings };
+    return { state: 'lunch', videos, usedMock: vc2?.usedMock, apiError: vc2?.apiError, settings };
   }
 
   return { state: 'waiting', minutesUntil: minsUntil, settings };

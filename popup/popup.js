@@ -42,14 +42,33 @@ function scoreLabel(score) {
   return 'Em destaque';
 }
 
-function renderVideos(videos, usedMock) {
+const API_ERROR_MESSAGES = {
+  youtube_api_disabled: '⚠️ Ative a <strong>YouTube Data API v3</strong> no <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank">Google Cloud Console</a>',
+  not_authenticated: '🔐 Conecte sua conta Google nas ⚙️ configurações para vídeos personalizados',
+  no_results: '📭 Nenhum vídeo encontrado nos seus canais com a duração configurada',
+};
+
+function renderVideos(videos, usedMock, apiError) {
   const list = $('video-list');
   list.innerHTML = '';
 
-  if (usedMock) {
-    $('mock-badge').classList.remove('hidden');
-  } else {
-    $('mock-badge').classList.add('hidden');
+  const mockBadge = $('mock-badge');
+  if (usedMock && mockBadge) {
+    mockBadge.classList.remove('hidden');
+
+    // Show targeted API error hint above the list
+    const existing = document.getElementById('api-hint');
+    if (existing) existing.remove();
+    if (apiError && API_ERROR_MESSAGES[apiError]) {
+      const hint = document.createElement('div');
+      hint.id = 'api-hint';
+      hint.className = 'api-hint';
+      hint.innerHTML = API_ERROR_MESSAGES[apiError];
+      list.before(hint);
+    }
+  } else if (mockBadge) {
+    mockBadge.classList.add('hidden');
+    document.getElementById('api-hint')?.remove();
   }
 
   videos.forEach((video, index) => {
@@ -108,7 +127,7 @@ async function loadState() {
     }
 
     if (response.state === 'lunch') {
-      renderVideos(response.videos, response.usedMock);
+      renderVideos(response.videos, response.usedMock, response.apiError);
     } else {
       startCountdown(response.minutesUntil, response.settings);
     }
