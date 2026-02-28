@@ -146,6 +146,28 @@ function engagementScore(stats) {
   return (likes + comments * 2) / Math.max(views, 1);
 }
 
+// ─── Shorts Detection ─────────────────────────────────────────────────────────
+function isShort(video) {
+  const dur = parseDurationToSeconds(video.contentDetails?.duration || 'PT0S');
+  const title = (video.snippet?.title || '').toLowerCase();
+  // Shorts are ≤ 62 seconds OR explicitly tagged
+  return dur <= 62 || title.includes('#shorts') || title.includes('#short');
+}
+
+// ─── Watched Videos ────────────────────────────────────────────────────────────
+async function getWatchedIds() {
+  const { watchedVideos } = await chrome.storage.local.get({ watchedVideos: [] });
+  return new Set(watchedVideos);
+}
+
+async function markVideoWatched(videoId) {
+  const watched = await getWatchedIds();
+  watched.add(videoId);
+  // Keep only last 500 watched IDs to avoid unbounded growth
+  const arr = Array.from(watched).slice(-500);
+  await chrome.storage.local.set({ watchedVideos: arr });
+}
+
 // ─── Mock Data (used when API not configured or fails) ───────────────────────
 function getMockVideos(count) {
   const mockData = [
@@ -269,11 +291,15 @@ async function fetchAndCacheVideos(settings) {
     // Fetch details for all collected video IDs (max 50 per request)
     const details = await fetchVideoDetails(token, allVideoIds.slice(0, 50));
 
-    // Filter by duration
+    // Filter by duration, Shorts, and already-watched videos
     const maxSeconds = settings.maxDurationMinutes * 60;
+    const watchedIds = await getWatchedIds();
     const filtered = details.filter(v => {
       const dur = parseDurationToSeconds(v.contentDetails?.duration || 'PT0S');
-      return dur > 0 && dur <= maxSeconds;
+      if (dur <= 0 || dur > maxSeconds) return false;  // wrong duration
+      if (isShort(v)) return false;                    // exclude Shorts
+      if (watchedIds.has(v.id)) return false;           // exclude watched
+      return true;
     });
 
     // Build video objects with engagement score
@@ -332,7 +358,7 @@ async function refreshIfLunchTime() {
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.type === 'GET_STATE') {
     handleGetState().then(sendResponse);
-    return true; // async
+    return true;
   }
   if (request.type === 'REFRESH_VIDEOS') {
     handleRefresh().then(sendResponse);
@@ -340,6 +366,10 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   }
   if (request.type === 'AUTH_INTERACTIVE') {
     handleInteractiveAuth().then(sendResponse);
+    return true;
+  }
+  if (request.type === 'MARK_WATCHED') {
+    markVideoWatched(request.videoId).then(() => sendResponse({ ok: true }));
     return true;
   }
 });

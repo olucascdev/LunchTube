@@ -99,6 +99,13 @@ function renderVideos(videos, usedMock, apiError) {
       </div>
     `;
 
+    // Mark as watched when clicked (only real YouTube IDs)
+    if (!video.id.startsWith('mock-')) {
+      a.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ type: 'MARK_WATCHED', videoId: video.id });
+      });
+    }
+
     list.appendChild(a);
   });
 
@@ -127,7 +134,16 @@ async function loadState() {
     }
 
     if (response.state === 'lunch') {
-      renderVideos(response.videos, response.usedMock, response.apiError);
+      // Defensive: handle old malformed cache format
+      let videos = response.videos;
+      if (!Array.isArray(videos)) {
+        if (videos?.videos && Array.isArray(videos.videos)) {
+          videos = videos.videos; // old format: { videos: [...], usedMock: true }
+        } else {
+          videos = [];
+        }
+      }
+      renderVideos(videos, response.usedMock, response.apiError);
     } else {
       startCountdown(response.minutesUntil, response.settings);
     }
