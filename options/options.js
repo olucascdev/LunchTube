@@ -27,7 +27,7 @@ async function loadSettings() {
       lunchStart: '12:00',
       lunchEnd: '13:00',
       maxDurationMinutes: 20,
-      videoCount: 10,
+      videoCount: 6,
     }
   });
 

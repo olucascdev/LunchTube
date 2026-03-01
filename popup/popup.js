@@ -43,32 +43,25 @@ function scoreLabel(score) {
 }
 
 const API_ERROR_MESSAGES = {
-  youtube_api_disabled: '⚠️ Ative a <strong>YouTube Data API v3</strong> no <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank">Google Cloud Console</a>',
+  youtube_api_disabled: '⚠️ <strong>Cota excedida</strong> ou <strong>API desativada</strong>. Verifique o status e a cota no <a href="https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas" target="_blank">Google Cloud Console</a>',
   not_authenticated: '🔐 Conecte sua conta Google nas ⚙️ configurações para vídeos personalizados',
   no_results: '📭 Nenhum vídeo encontrado nos seus canais com a duração configurada',
 };
 
-function renderVideos(videos, usedMock, apiError, displayCount) {
+function renderVideos(videos, apiError, remainingRefreshes, refreshLimitReached) {
   const list = $('video-list');
   list.innerHTML = '';
 
   const mockBadge = $('mock-badge');
-  if (usedMock && mockBadge) {
-    mockBadge.classList.remove('hidden');
+  if (mockBadge) mockBadge.classList.add('hidden');
+  document.getElementById('api-hint')?.remove();
 
-    // Show targeted API error hint above the list
-    const existing = document.getElementById('api-hint');
-    if (existing) existing.remove();
-    if (apiError && API_ERROR_MESSAGES[apiError]) {
-      const hint = document.createElement('div');
-      hint.id = 'api-hint';
-      hint.className = 'api-hint';
-      hint.innerHTML = API_ERROR_MESSAGES[apiError];
-      list.before(hint);
-    }
-  } else if (mockBadge) {
-    mockBadge.classList.add('hidden');
-    document.getElementById('api-hint')?.remove();
+  if (apiError && API_ERROR_MESSAGES[apiError]) {
+    const hint = document.createElement('div');
+    hint.id = 'api-hint';
+    hint.className = 'api-hint';
+    hint.innerHTML = API_ERROR_MESSAGES[apiError];
+    list.before(hint);
   }
 
   videos.forEach((video, index) => {
@@ -99,22 +92,24 @@ function renderVideos(videos, usedMock, apiError, displayCount) {
       </div>
     `;
 
-    // Mark as watched when clicked (only real YouTube IDs)
-    if (!video.id.startsWith('mock-')) {
-      a.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ type: 'MARK_WATCHED', videoId: video.id });
-      });
-    }
+    // Mark as watched when clicked
+    a.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ type: 'MARK_WATCHED', videoId: video.id });
+    });
 
     list.appendChild(a);
   });
 
-  // Handle Decision Pressure: disable refresh if only 1 video or count reached 1
   const refreshBtn = $('btn-refresh');
   if (refreshBtn) {
-    const reachedMin = (displayCount !== undefined && displayCount <= 1);
+    const reachedMin = videos.length <= 1 || refreshLimitReached;
     refreshBtn.disabled = reachedMin;
-    refreshBtn.title = reachedMin ? 'Escolha um destes! (Limite de fôlego atingido)' : 'Ver outras opções (-1 vídeo)';
+    
+    if (refreshLimitReached) {
+      refreshBtn.title = 'Limite de 3 recargas atingido para este almoço.';
+    } else {
+      refreshBtn.title = `Trocar sugestões (${remainingRefreshes} restantes)`;
+    }
   }
 
   $('subtitle').textContent = `${videos.length} vídeo${videos.length === 1 ? '' : 's'} para o almoço`;
@@ -151,7 +146,7 @@ async function loadState() {
           videos = [];
         }
       }
-      renderVideos(videos, response.usedMock, response.apiError, response.displayCount);
+      renderVideos(videos, response.apiError, response.remainingRefreshes, response.refreshLimitReached);
     } else {
       startCountdown(response.minutesUntil, response.settings);
     }
@@ -172,10 +167,10 @@ async function refreshVideos() {
   try {
     const response = await chrome.runtime.sendMessage({ type: 'REFRESH_VIDEOS' });
     if (response?.videos) {
-      renderVideos(response.videos, response.usedMock, response.apiError, response.displayCount);
+      renderVideos(response.videos, response.apiError, response.remainingRefreshes, response.refreshLimitReached);
       
       // Auto-open if we reached exactly 1 video
-      if (response.videos.length === 1 && !response.videos[0].id.startsWith('mock-')) {
+      if (response.videos.length === 1) {
         const video = response.videos[0];
         const videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
         

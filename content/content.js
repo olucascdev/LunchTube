@@ -13,15 +13,11 @@
   }
 
   // ─── Create Panel HTML ───────────────────────────────────────────────────
-  function createPanel(videos, usedMock) {
-    const panel = document.createElement('div');
-    panel.id = PANEL_ID;
+  function createPanel(videos) {
+  const panel = document.createElement('div');
+  panel.id = PANEL_ID;
 
-    const mockBadge = usedMock
-      ? '<span class="lt-mock-badge">demo</span>'
-      : '';
-
-    const videoCards = videos.slice(0, 5).map(v => `
+  const videoCards = videos.slice(0, 5).map(v => `
       <a class="lt-card" href="https://www.youtube.com/watch?v=${v.id}" target="_self">
         <div class="lt-thumb-wrap">
           <img class="lt-thumb" src="${v.thumbnail}" alt="" loading="lazy" />
@@ -40,7 +36,6 @@
           <span class="lt-icon">🍴</span>
           <span class="lt-title-main">LunchTube</span>
           <span class="lt-subtitle">Hora do almoço!</span>
-          ${mockBadge}
         </div>
         <button class="lt-close" id="lt-close-btn" title="Fechar">✕</button>
       </div>
@@ -61,10 +56,10 @@
   }
 
   // ─── Inject Panel ────────────────────────────────────────────────────────
-  function injectPanel(videos, usedMock) {
-    if (document.getElementById(PANEL_ID)) return;
+  function injectPanel(videos) {
+  if (document.getElementById(PANEL_ID)) return;
 
-    const panel = createPanel(videos, usedMock);
+  const panel = createPanel(videos);
 
     // Insert before the main content area
     const target =
@@ -88,10 +83,10 @@
 
     try {
       const response = await chrome.runtime.sendMessage({ type: 'GET_STATE' });
-      if (response?.state === 'lunch' && response.videos?.length > 0) {
-        // Small delay to let YouTube render its content first
-        setTimeout(() => injectPanel(response.videos, response.usedMock), 1500);
-      }
+    if (response?.state === 'lunch' && response.videos?.length > 0) {
+      // Small delay to let YouTube render its content first
+      setTimeout(() => injectPanel(response.videos), 1500);
+    }
     } catch (err) {
       // Extension context may not be available, fail silently
     }
